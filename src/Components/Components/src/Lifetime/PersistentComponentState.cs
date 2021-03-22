@@ -2,8 +2,10 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.IO.Pipelines;
 using System.Text.Json;
 using System.Threading.Tasks;
 using static Microsoft.AspNetCore.Internal.LinkerFlags;
@@ -15,19 +17,19 @@ namespace Microsoft.AspNetCore.Components
     /// </summary>
     public class PersistentComponentState
     {
-        private IDictionary<string, byte[]>? _existingState;
-        private readonly IDictionary<string, byte[]> _currentState;
+        private IDictionary<string, ReadOnlySequence<byte>>? _existingState;
+        private IDictionary<string, Pipe> _currentState;
         private readonly List<Func<Task>> _registeredCallbacks;
 
         internal PersistentComponentState(
-            IDictionary<string, byte[]> currentState,
+            IDictionary<string, Pipe> currentState,
             List<Func<Task>> pauseCallbacks)
         {
             _currentState = currentState;
             _registeredCallbacks = pauseCallbacks;
         }
 
-        internal void InitializeExistingState(IDictionary<string, byte[]> existingState)
+        internal void InitializeExistingState(IDictionary<string, ReadOnlySequence<byte>> existingState)
         {
             if (_existingState != null)
             {
@@ -62,7 +64,7 @@ namespace Microsoft.AspNetCore.Components
         /// <param name="key">The key used to persist the state.</param>
         /// <param name="value">The persisted state.</param>
         /// <returns><c>true</c> if the state was found; <c>false</c> otherwise.</returns>
-        public bool TryTake(string key, [MaybeNullWhen(false)] out byte[]? value)
+        public bool TryTake(string key, [MaybeNullWhen(false)] out ReadOnlySequence<byte> value)
         {
             if (key is null)
             {
@@ -75,7 +77,7 @@ namespace Microsoft.AspNetCore.Components
                 // and we don't want to fail in that case.
                 // When a service is prerendering there is no state to restore and in other cases the host
                 // is responsible for initializing the state before services or components can access it.
-                value = null;
+                value = default;
                 return false;
             }
 
@@ -91,27 +93,30 @@ namespace Microsoft.AspNetCore.Components
         }
 
         /// <summary>
-        /// Persists the serialized state <paramref name="value"/> for the given <paramref name="key"/>.
+        /// Persists the serialized state <paramref name="valueWriter"/> for the given <paramref name="key"/>.
         /// </summary>
         /// <param name="key">The key to use to persist the state.</param>
-        /// <param name="value">The state to persist.</param>
-        public void Persist(string key, byte[] value)
+        /// <param name="valueWriter">The state to persist.</param>
+        public void Persist(string key, Action<IBufferWriter<byte>> valueWriter)
         {
             if (key is null)
             {
                 throw new ArgumentNullException(nameof(key));
             }
 
-            if (value is null)
+            if (valueWriter is null)
             {
-                throw new ArgumentNullException(nameof(value));
+                throw new ArgumentNullException(nameof(valueWriter));
             }
 
             if (_currentState.ContainsKey(key))
             {
                 throw new ArgumentException($"There is already a persisted object under the same key '{key}'");
             }
-            _currentState.Add(key, value);
+
+            var pipe = new Pipe();
+            _currentState.Add(key, pipe);
+            valueWriter(pipe.Writer);
         }
 
         /// <summary>
@@ -127,7 +132,19 @@ namespace Microsoft.AspNetCore.Components
                 throw new ArgumentNullException(nameof(key));
             }
 
-            Persist(key, JsonSerializer.SerializeToUtf8Bytes(instance, JsonSerializerOptionsProvider.Options));
+            if (key is null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            if (_currentState.ContainsKey(key))
+            {
+                throw new ArgumentException($"There is already a persisted object under the same key '{key}'");
+            }
+
+            var pipe = new Pipe();
+            _currentState.Add(key, pipe);
+            JsonSerializer.Serialize(new Utf8JsonWriter(pipe.Writer), instance, JsonSerializerOptionsProvider.Options);
         }
 
         /// <summary>
@@ -148,7 +165,8 @@ namespace Microsoft.AspNetCore.Components
 
             if (TryTake(key, out var data))
             {
-                instance = JsonSerializer.Deserialize<TValue>(data, JsonSerializerOptionsProvider.Options)!;
+                var reader = new Utf8JsonReader(data);
+                instance = JsonSerializer.Deserialize<TValue>(ref reader, JsonSerializerOptionsProvider.Options)!;
                 return true;
             }
             else

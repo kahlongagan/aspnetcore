@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
@@ -20,10 +21,10 @@ namespace Microsoft.AspNetCore.Components
         public ProtectedPrerenderComponentApplicationStore(string existingState, IDataProtectionProvider dataProtectionProvider)
         {
             CreateProtector(dataProtectionProvider);
-            ExistingState = JsonSerializer.Deserialize<Dictionary<string, byte[]>>(_protector.Unprotect(Convert.FromBase64String(existingState)));
+            ExistingState = JsonSerializer.Deserialize<Dictionary<string, ReadOnlySequence<byte>>>(_protector.Unprotect(Convert.FromBase64String(existingState)));
         }
 
-        protected override byte[] SerializeState(IReadOnlyDictionary<string, byte[]> state)
+        protected override byte[] SerializeState(IReadOnlyDictionary<string, ReadOnlySequence<byte>> state)
         {
             var bytes = base.SerializeState(state);
             if (_protector != null)

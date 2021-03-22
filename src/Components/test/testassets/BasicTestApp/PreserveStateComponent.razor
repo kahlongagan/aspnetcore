@@ -1,6 +1,7 @@
 ﻿@inject PersistentComponentState AppState
 @inject PreserveStateService PreserveService
 @using System.Text
+@using System.Buffers
 
 <p id="@($"state-{State}")">@State: @_state</p>
 
@@ -51,13 +52,19 @@
         else
         {
             _state = Guid.NewGuid().ToString();
-            AppState.Persist(State, Encoding.UTF8.GetBytes(_state));
+            AppState.Persist(State, writer => WriteUtf8Bytes(writer, _state));
             _extraState = Guid.NewGuid().ToString();
             if(ExtraState != null)
             {
                 _extraStateAvailable = true;
-                AppState.Persist(ExtraState, Encoding.UTF8.GetBytes(_extraState));
+                AppState.Persist(ExtraState, writer => WriteUtf8Bytes(writer, _extraState));
             }
+        }
+
+        static void WriteUtf8Bytes(IBufferWriter<byte> writer, string state)
+        {
+            var bytes = Encoding.UTF8.GetBytes(state);
+            writer.Write(bytes);
         }
     }
 

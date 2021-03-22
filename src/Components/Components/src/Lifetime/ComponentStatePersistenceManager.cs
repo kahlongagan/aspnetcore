@@ -2,10 +2,9 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
-using System.Runtime.CompilerServices;
+using System.IO.Pipelines;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.Lifetime;
 using Microsoft.AspNetCore.Components.RenderTree;
@@ -20,7 +19,7 @@ namespace Microsoft.AspNetCore.Components.Infrastructure
     {
         private bool _stateIsPersisted;
         private List<Func<Task>> _pauseCallbacks = new();
-        private readonly Dictionary<string, byte[]> _currentState = new();
+        private readonly Dictionary<string, Pipe> _currentState = new();
         private readonly ILogger<ComponentStatePersistenceManager> _logger;
 
         /// <summary>
@@ -69,8 +68,26 @@ namespace Microsoft.AspNetCore.Components.Infrastructure
             {
                 await PauseAsync();
 
-                var data = new ReadOnlyDictionary<string, byte[]>(_currentState);
+                var data = new Dictionary<string, ReadOnlySequence<byte>>();
+                foreach (var (key, value) in _currentState)
+                {
+                    data[key] = await ReadToEnd(value.Reader);
+                }
                 await store.PersistStateAsync(data);
+            }
+
+            async Task<ReadOnlySequence<byte>> ReadToEnd(PipeReader reader)
+            {
+                var result = await reader.ReadAsync();
+                reader.AdvanceTo(result.Buffer.Start, result.Buffer.End);
+                while (!result.IsCompleted)
+                {
+                    // Consume nothing, just wait for everything
+                    result = await reader.ReadAsync();
+                    reader.AdvanceTo(result.Buffer.Start, result.Buffer.End);
+                }
+
+                return result.Buffer;
             }
         }
 

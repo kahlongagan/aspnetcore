@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.Infrastructure;
@@ -21,8 +22,8 @@ namespace Microsoft.AspNetCore.Components
         public async Task RestoreStateAsync_InitializesStateWithDataFromTheProvidedStore()
         {
             // Arrange
-            byte[] data = new byte[] { 0, 1, 2, 3, 4 };
-            var state = new Dictionary<string, byte[]>
+            var data = new ReadOnlySequence<byte>(new byte[] { 0, 1, 2, 3, 4 });
+            var state = new Dictionary<string, ReadOnlySequence<byte>>
             {
                 ["MyState"] = data
             };
@@ -42,9 +43,9 @@ namespace Microsoft.AspNetCore.Components
         public async Task RestoreStateAsync_ThrowsOnDoubleInitialization()
         {
             // Arrange
-            var state = new Dictionary<string, byte[]>
+            var state = new Dictionary<string, ReadOnlySequence<byte>>
             {
-                ["MyState"] = new byte[] { 0, 1, 2, 3, 4 }
+                ["MyState"] = new ReadOnlySequence<byte>(new byte[] { 0, 1, 2, 3, 4 })
             };
             var store = new TestStore(state);
             var lifetime = new ComponentStatePersistenceManager(NullLogger<ComponentStatePersistenceManager>.Instance);
@@ -59,28 +60,28 @@ namespace Microsoft.AspNetCore.Components
         public async Task PersistStateAsync_SavesPersistedStateToTheStore()
         {
             // Arrange
-            var state = new Dictionary<string, byte[]>();
+            var state = new Dictionary<string, ReadOnlySequence<byte>>();
             var store = new TestStore(state);
             var lifetime = new ComponentStatePersistenceManager(NullLogger<ComponentStatePersistenceManager>.Instance);
 
             var renderer = new TestRenderer();
             var data = new byte[] { 1, 2, 3, 4 };
 
-            lifetime.State.Persist("MyState", new byte[] { 1, 2, 3, 4 });
+            lifetime.State.Persist("MyState", writer => writer.Write(new byte[] { 1, 2, 3, 4 }));
 
             // Act
             await lifetime.PersistStateAsync(store, renderer);
 
             // Assert
             Assert.True(store.State.TryGetValue("MyState", out var persisted));
-            Assert.Equal(data, persisted);
+            Assert.Equal(data, persisted.ToArray());
         }
 
         [Fact]
         public async Task PersistStateAsync_InvokesPauseCallbacksDuringPersist()
         {
             // Arrange
-            var state = new Dictionary<string, byte[]>();
+            var state = new Dictionary<string, ReadOnlySequence<byte>>();
             var store = new TestStore(state);
             var lifetime = new ComponentStatePersistenceManager(NullLogger<ComponentStatePersistenceManager>.Instance);
             var renderer = new TestRenderer();
@@ -100,7 +101,7 @@ namespace Microsoft.AspNetCore.Components
         public async Task PersistStateAsync_FiresCallbacksInParallel()
         {
             // Arrange
-            var state = new Dictionary<string, byte[]>();
+            var state = new Dictionary<string, ReadOnlySequence<byte>>();
             var store = new TestStore(state);
             var lifetime = new ComponentStatePersistenceManager(NullLogger<ComponentStatePersistenceManager>.Instance);
             var renderer = new TestRenderer();
@@ -131,7 +132,7 @@ namespace Microsoft.AspNetCore.Components
             var sink = new TestSink();
             var loggerFactory = new TestLoggerFactory(sink, true);
             var logger = loggerFactory.CreateLogger<ComponentStatePersistenceManager>();
-            var state = new Dictionary<string, byte[]>();
+            var state = new Dictionary<string, ReadOnlySequence<byte>>();
             var store = new TestStore(state);
             var lifetime = new ComponentStatePersistenceManager(logger);
             var renderer = new TestRenderer();
@@ -157,7 +158,7 @@ namespace Microsoft.AspNetCore.Components
             var sink = new TestSink();
             var loggerFactory = new TestLoggerFactory(sink, true);
             var logger = loggerFactory.CreateLogger<ComponentStatePersistenceManager>();
-            var state = new Dictionary<string, byte[]>();
+            var state = new Dictionary<string, ReadOnlySequence<byte>>();
             var store = new TestStore(state);
             var lifetime = new ComponentStatePersistenceManager(logger);
             var renderer = new TestRenderer();
@@ -183,14 +184,14 @@ namespace Microsoft.AspNetCore.Components
         public async Task PersistStateAsync_ThrowsWhenDeveloperTriesToPersistStateMultipleTimes()
         {
             // Arrange
-            var state = new Dictionary<string, byte[]>();
+            var state = new Dictionary<string, ReadOnlySequence<byte>>();
             var store = new TestStore(state);
             var lifetime = new ComponentStatePersistenceManager(NullLogger<ComponentStatePersistenceManager>.Instance);
 
             var renderer = new TestRenderer();
             var data = new byte[] { 1, 2, 3, 4 };
 
-            lifetime.State.Persist("MyState", new byte[] { 1, 2, 3, 4 });
+            lifetime.State.Persist("MyState", writer => writer.Write(new byte[] { 1, 2, 3, 4 }));
 
             // Act
             await lifetime.PersistStateAsync(store, renderer);
@@ -222,21 +223,21 @@ namespace Microsoft.AspNetCore.Components
 
         private class TestStore : IPersistentComponentStateStore
         {
-            public TestStore(IDictionary<string, byte[]> initialState)
+            public TestStore(IDictionary<string, ReadOnlySequence<byte>> initialState)
             {
                 State = initialState;
             }
 
-            public IDictionary<string, byte[]> State { get; set; }
+            public IDictionary<string, ReadOnlySequence<byte>> State { get; set; }
 
-            public Task<IDictionary<string, byte[]>> GetPersistedStateAsync()
+            public Task<IDictionary<string, ReadOnlySequence<byte>>> GetPersistedStateAsync()
             {
                 return Task.FromResult(State);
             }
 
-            public Task PersistStateAsync(IReadOnlyDictionary<string, byte[]> state)
+            public Task PersistStateAsync(IReadOnlyDictionary<string, ReadOnlySequence<byte>> state)
             {
-                State = new Dictionary<string, byte[]>(state);
+                State = new Dictionary<string, ReadOnlySequence<byte>>(state);
                 return Task.CompletedTask;
             }
         }

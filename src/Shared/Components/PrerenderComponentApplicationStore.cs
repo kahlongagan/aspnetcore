@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -21,9 +22,9 @@ namespace Microsoft.AspNetCore.Components
             if (existingState is null)
             {
                 throw new ArgumentNullException(nameof(existingState));
-            }
+            }            
 
-            ExistingState = JsonSerializer.Deserialize<Dictionary<string, byte[]>>(Convert.FromBase64String(existingState)) ??
+            ExistingState = JsonSerializer.Deserialize<Dictionary<string, ReadOnlySequence<byte>>>(Convert.FromBase64String(existingState)) ??
                 throw new ArgumentException(nameof(existingState));
         }
 
@@ -31,19 +32,19 @@ namespace Microsoft.AspNetCore.Components
         public string? PersistedState { get; private set; }
 #nullable disable
 
-        public Dictionary<string, byte[]> ExistingState { get; protected set; }
+        public Dictionary<string, ReadOnlySequence<byte>> ExistingState { get; protected set; }
 
-        public Task<IDictionary<string, byte[]>> GetPersistedStateAsync()
+        public Task<IDictionary<string, ReadOnlySequence<byte>>> GetPersistedStateAsync()
         {
-            return Task.FromResult((IDictionary<string, byte[]>)ExistingState);
+            return Task.FromResult((IDictionary<string, ReadOnlySequence<byte>>)ExistingState);
         }
 
-        protected virtual byte[] SerializeState(IReadOnlyDictionary<string, byte[]> state)
+        protected virtual byte[] SerializeState(IReadOnlyDictionary<string, ReadOnlySequence<byte>> state)
         {
             return JsonSerializer.SerializeToUtf8Bytes(state);
         }
 
-        public Task PersistStateAsync(IReadOnlyDictionary<string, byte[]> state)
+        public Task PersistStateAsync(IReadOnlyDictionary<string, ReadOnlySequence<byte>> state)
         {
             var bytes = SerializeState(state);
 
