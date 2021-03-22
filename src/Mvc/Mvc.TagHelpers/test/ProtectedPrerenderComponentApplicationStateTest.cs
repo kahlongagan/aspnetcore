@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -24,9 +25,9 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
             var expected = @"{""MyValue"":""AQIDBA==""}";
             var store = new ProtectedPrerenderComponentApplicationStore(_provider);
 
-            var state = new Dictionary<string, byte[]>()
+            var state = new Dictionary<string, ReadOnlySequence<byte>>()
             {
-                ["MyValue"] = new byte[] { 1, 2, 3, 4 }
+                ["MyValue"] = new ReadOnlySequence<byte>(new byte[] { 1, 2, 3, 4 })
             };
 
             // Act
@@ -40,9 +41,9 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
         public async Task GetPersistStateAsync_CanUnprotectPersistedState()
         {
             // Arrange
-            var expectedState = new Dictionary<string, byte[]>()
+            var expectedState = new Dictionary<string, ReadOnlySequence<byte>>()
             {
-                ["MyValue"] = new byte[] { 1, 2, 3, 4 }
+                ["MyValue"] = new ReadOnlySequence<byte>(new byte[] { 1, 2, 3, 4 })
             };
 
             var persistedState = Convert.ToBase64String(_protector.Protect(JsonSerializer.SerializeToUtf8Bytes(expectedState)));

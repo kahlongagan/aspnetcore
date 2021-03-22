@@ -4,7 +4,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Lifetime;
+using Microsoft.AspNetCore.Components.Infrastructure;
 using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Html;
@@ -56,7 +56,7 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
             }
 
             var services = ViewContext.HttpContext.RequestServices;
-            var manager = services.GetRequiredService<ComponentApplicationLifetime>();
+            var manager = services.GetRequiredService<ComponentStatePersistenceManager>();
             var renderer = services.GetRequiredService<HtmlRenderer>();
             var store = PersistenceMode switch
             {
