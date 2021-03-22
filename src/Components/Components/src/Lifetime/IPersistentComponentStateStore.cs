@@ -6,7 +6,7 @@ namespace Microsoft.AspNetCore.Components.Lifetime
     /// <summary>
     /// Manages the storage for components and services that are part of a Blazor application.
     /// </summary>
-    public interface IComponentApplicationStateStore
+    public interface IPersistentComponentStateStore
     {
         /// <summary>
         /// Gets the persisted state from the store.

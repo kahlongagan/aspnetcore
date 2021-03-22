@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Components.Lifetime;
 
 namespace Microsoft.AspNetCore.Components
 {
-    internal class PrerenderComponentApplicationStore : IComponentApplicationStateStore
+    internal class PrerenderComponentApplicationStore : IPersistentComponentStateStore
     {
         public PrerenderComponentApplicationStore()
         {

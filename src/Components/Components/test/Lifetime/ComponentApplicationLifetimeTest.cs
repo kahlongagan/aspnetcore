@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components.Infrastructure;
 using Microsoft.AspNetCore.Components.Lifetime;
 using Microsoft.AspNetCore.Components.RenderTree;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,13 +27,13 @@ namespace Microsoft.AspNetCore.Components
                 ["MyState"] = data
             };
             var store = new TestStore(state);
-            var lifetime = new ComponentApplicationLifetime(NullLogger<ComponentApplicationLifetime>.Instance);
+            var lifetime = new ComponentStatePersistenceManager(NullLogger<ComponentStatePersistenceManager>.Instance);
 
             // Act
             await lifetime.RestoreStateAsync(store);
 
             // Assert
-            Assert.True(lifetime.State.TryTakePersistedState("MyState", out var retrieved));
+            Assert.True(lifetime.State.TryTake("MyState", out var retrieved));
             Assert.Empty(state);
             Assert.Equal(data, retrieved);
         }
@@ -46,7 +47,7 @@ namespace Microsoft.AspNetCore.Components
                 ["MyState"] = new byte[] { 0, 1, 2, 3, 4 }
             };
             var store = new TestStore(state);
-            var lifetime = new ComponentApplicationLifetime(NullLogger<ComponentApplicationLifetime>.Instance);
+            var lifetime = new ComponentStatePersistenceManager(NullLogger<ComponentStatePersistenceManager>.Instance);
 
             await lifetime.RestoreStateAsync(store);
 
@@ -60,12 +61,12 @@ namespace Microsoft.AspNetCore.Components
             // Arrange
             var state = new Dictionary<string, byte[]>();
             var store = new TestStore(state);
-            var lifetime = new ComponentApplicationLifetime(NullLogger<ComponentApplicationLifetime>.Instance);
+            var lifetime = new ComponentStatePersistenceManager(NullLogger<ComponentStatePersistenceManager>.Instance);
 
             var renderer = new TestRenderer();
             var data = new byte[] { 1, 2, 3, 4 };
 
-            lifetime.State.PersistState("MyState", new byte[] { 1, 2, 3, 4 });
+            lifetime.State.Persist("MyState", new byte[] { 1, 2, 3, 4 });
 
             // Act
             await lifetime.PersistStateAsync(store, renderer);
@@ -81,12 +82,12 @@ namespace Microsoft.AspNetCore.Components
             // Arrange
             var state = new Dictionary<string, byte[]>();
             var store = new TestStore(state);
-            var lifetime = new ComponentApplicationLifetime(NullLogger<ComponentApplicationLifetime>.Instance);
+            var lifetime = new ComponentStatePersistenceManager(NullLogger<ComponentStatePersistenceManager>.Instance);
             var renderer = new TestRenderer();
             var data = new byte[] { 1, 2, 3, 4 };
             var invoked = false;
 
-            lifetime.State.OnPersisting += () => { invoked = true; return default; };
+            lifetime.State.RegisterOnPersisting(() => { invoked = true; return default; });
 
             // Act
             await lifetime.PersistStateAsync(store, renderer);
@@ -101,7 +102,7 @@ namespace Microsoft.AspNetCore.Components
             // Arrange
             var state = new Dictionary<string, byte[]>();
             var store = new TestStore(state);
-            var lifetime = new ComponentApplicationLifetime(NullLogger<ComponentApplicationLifetime>.Instance);
+            var lifetime = new ComponentStatePersistenceManager(NullLogger<ComponentStatePersistenceManager>.Instance);
             var renderer = new TestRenderer();
 
             var sequence = new List<int> { };
@@ -109,8 +110,8 @@ namespace Microsoft.AspNetCore.Components
             var tcs = new TaskCompletionSource();
             var tcs2 = new TaskCompletionSource();
 
-            lifetime.State.OnPersisting += async () => { sequence.Add(1); await tcs.Task; sequence.Add(3); };
-            lifetime.State.OnPersisting += async () => { sequence.Add(2); await tcs2.Task; sequence.Add(4); };
+            lifetime.State.RegisterOnPersisting(async () => { sequence.Add(1); await tcs.Task; sequence.Add(3); });
+            lifetime.State.RegisterOnPersisting(async () => { sequence.Add(2); await tcs2.Task; sequence.Add(4); });
 
             // Act
             var persistTask = lifetime.PersistStateAsync(store, renderer);
@@ -129,16 +130,16 @@ namespace Microsoft.AspNetCore.Components
             // Arrange
             var sink = new TestSink();
             var loggerFactory = new TestLoggerFactory(sink, true);
-            var logger = loggerFactory.CreateLogger<ComponentApplicationLifetime>();
+            var logger = loggerFactory.CreateLogger<ComponentStatePersistenceManager>();
             var state = new Dictionary<string, byte[]>();
             var store = new TestStore(state);
-            var lifetime = new ComponentApplicationLifetime(logger);
+            var lifetime = new ComponentStatePersistenceManager(logger);
             var renderer = new TestRenderer();
             var data = new byte[] { 1, 2, 3, 4 };
             var invoked = false;
 
-            lifetime.State.OnPersisting += () => throw new InvalidOperationException();
-            lifetime.State.OnPersisting += () => { invoked = true; return Task.CompletedTask; };
+            lifetime.State.RegisterOnPersisting(() => throw new InvalidOperationException());
+            lifetime.State.RegisterOnPersisting(() => { invoked = true; return Task.CompletedTask; });
 
             // Act
             await lifetime.PersistStateAsync(store, renderer);
@@ -155,16 +156,16 @@ namespace Microsoft.AspNetCore.Components
             // Arrange
             var sink = new TestSink();
             var loggerFactory = new TestLoggerFactory(sink, true);
-            var logger = loggerFactory.CreateLogger<ComponentApplicationLifetime>();
+            var logger = loggerFactory.CreateLogger<ComponentStatePersistenceManager>();
             var state = new Dictionary<string, byte[]>();
             var store = new TestStore(state);
-            var lifetime = new ComponentApplicationLifetime(logger);
+            var lifetime = new ComponentStatePersistenceManager(logger);
             var renderer = new TestRenderer();
             var invoked = false;
             var tcs = new TaskCompletionSource();
 
-            lifetime.State.OnPersisting += async () => { await tcs.Task; throw new InvalidOperationException(); };
-            lifetime.State.OnPersisting += () => { invoked = true; return Task.CompletedTask; };
+            lifetime.State.RegisterOnPersisting(async () => { await tcs.Task; throw new InvalidOperationException(); });
+            lifetime.State.RegisterOnPersisting(() => { invoked = true; return Task.CompletedTask; });
 
             // Act
             var persistTask = lifetime.PersistStateAsync(store, renderer);
@@ -184,12 +185,12 @@ namespace Microsoft.AspNetCore.Components
             // Arrange
             var state = new Dictionary<string, byte[]>();
             var store = new TestStore(state);
-            var lifetime = new ComponentApplicationLifetime(NullLogger<ComponentApplicationLifetime>.Instance);
+            var lifetime = new ComponentStatePersistenceManager(NullLogger<ComponentStatePersistenceManager>.Instance);
 
             var renderer = new TestRenderer();
             var data = new byte[] { 1, 2, 3, 4 };
 
-            lifetime.State.PersistState("MyState", new byte[] { 1, 2, 3, 4 });
+            lifetime.State.Persist("MyState", new byte[] { 1, 2, 3, 4 });
 
             // Act
             await lifetime.PersistStateAsync(store, renderer);
@@ -219,7 +220,7 @@ namespace Microsoft.AspNetCore.Components
             }
         }
 
-        private class TestStore : IComponentApplicationStateStore
+        private class TestStore : IPersistentComponentStateStore
         {
             public TestStore(IDictionary<string, byte[]> initialState)
             {
