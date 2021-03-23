@@ -5,6 +5,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.DataProtection;
 
 namespace Microsoft.AspNetCore.Components
@@ -21,12 +22,12 @@ namespace Microsoft.AspNetCore.Components
         public ProtectedPrerenderComponentApplicationStore(string existingState, IDataProtectionProvider dataProtectionProvider)
         {
             CreateProtector(dataProtectionProvider);
-            ExistingState = JsonSerializer.Deserialize<Dictionary<string, ReadOnlySequence<byte>>>(_protector.Unprotect(Convert.FromBase64String(existingState)));
+            DeserializeState(_protector.Unprotect(Convert.FromBase64String(existingState)));
         }
 
-        protected override byte[] SerializeState(IReadOnlyDictionary<string, ReadOnlySequence<byte>> state)
+        protected async override Task<byte[]> SerializeState(IReadOnlyDictionary<string, ReadOnlySequence<byte>> state)
         {
-            var bytes = base.SerializeState(state);
+            var bytes = await base.SerializeState(state);
             if (_protector != null)
             {
                 bytes = _protector.Protect(bytes);
