@@ -4,6 +4,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Xunit;
@@ -45,7 +46,9 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
             var state = await store.GetPersistedStateAsync();
 
             // Assert
-            Assert.Equal(expected, state);
+            Assert.Equal(
+                expected.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToArray()),
+                state.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToArray()));
         }
     }
 }

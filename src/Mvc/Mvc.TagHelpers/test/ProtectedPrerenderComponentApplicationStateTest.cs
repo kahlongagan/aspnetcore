@@ -4,6 +4,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -41,9 +42,9 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
         public async Task GetPersistStateAsync_CanUnprotectPersistedState()
         {
             // Arrange
-            var expectedState = new Dictionary<string, ReadOnlySequence<byte>>()
+            var expectedState = new Dictionary<string, byte []>()
             {
-                ["MyValue"] = new ReadOnlySequence<byte>(new byte[] { 1, 2, 3, 4 })
+                ["MyValue"] = new byte[] { 1, 2, 3, 4 }
             };
 
             var persistedState = Convert.ToBase64String(_protector.Protect(JsonSerializer.SerializeToUtf8Bytes(expectedState)));
@@ -53,7 +54,9 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
             var restored = await store.GetPersistedStateAsync();
 
             // Assert
-            Assert.Equal(expectedState, restored);
+            Assert.Equal(
+                expectedState.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToArray()),
+                restored.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToArray()));
         }
 
         [Fact]
