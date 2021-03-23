@@ -22,10 +22,21 @@ namespace Microsoft.AspNetCore.Components
             if (existingState is null)
             {
                 throw new ArgumentNullException(nameof(existingState));
-            }            
+            }
 
-            ExistingState = JsonSerializer.Deserialize<Dictionary<string, ReadOnlySequence<byte>>>(Convert.FromBase64String(existingState)) ??
-                throw new ArgumentException(nameof(existingState));
+            var state = JsonSerializer.Deserialize<Dictionary<string, byte[]>>(Convert.FromBase64String(existingState));
+            if (state == null)
+            {
+                throw new ArgumentException("Could not deserialize state correctly", nameof(existingState));
+            }
+
+            var stateDictionary = new Dictionary<string, ReadOnlySequence<byte>>();
+            foreach (var (key, value) in state)
+            {
+                stateDictionary.Add(key, new ReadOnlySequence<byte>(value));
+            }
+
+            ExistingState = stateDictionary;
         }
 
 #nullable enable
@@ -41,7 +52,37 @@ namespace Microsoft.AspNetCore.Components
 
         protected virtual byte[] SerializeState(IReadOnlyDictionary<string, ReadOnlySequence<byte>> state)
         {
-            return JsonSerializer.SerializeToUtf8Bytes(state);
+            // System.Text.Json doesn't support serializing ReadonlySequence<byte> so we need to buffer
+            // the data with a memory pool here. We will change our serialization strategy in the future here
+            // so that we can avoid this step.
+            var pool = MemoryPool<byte>.Shared;
+            var memory = new List<IMemoryOwner<byte>>();
+            var serialization = new Dictionary<string, Memory<byte>>();
+            try
+            {
+                foreach (var (key, value) in state)
+                {
+                    IMemoryOwner<byte> buffer = null;
+                    if (value.Length < pool.MaxBufferSize)
+                    {
+                        buffer = pool.Rent((int)value.Length);
+                        memory.Add(buffer);
+                        value.CopyTo(buffer.Memory.Span.Slice(0, (int)value.Length));
+                    }
+
+                    serialization.Add(key, buffer != null ? buffer.Memory.Slice(0, (int)value.Length) : value.ToArray());
+                }
+
+                return JsonSerializer.SerializeToUtf8Bytes(serialization, JsonSerializerOptionsProvider.Options);
+            }
+            finally
+            {
+                serialization.Clear();
+                foreach (var item in memory)
+                {
+                    item.Dispose();
+                }
+            }
         }
 
         public Task PersistStateAsync(IReadOnlyDictionary<string, ReadOnlySequence<byte>> state)

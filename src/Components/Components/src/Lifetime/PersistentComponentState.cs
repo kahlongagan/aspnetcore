@@ -117,6 +117,7 @@ namespace Microsoft.AspNetCore.Components
             var pipe = new Pipe();
             _currentState.Add(key, pipe);
             valueWriter(pipe.Writer);
+            pipe.Writer.Complete();
         }
 
         /// <summary>
@@ -145,6 +146,7 @@ namespace Microsoft.AspNetCore.Components
             var pipe = new Pipe();
             _currentState.Add(key, pipe);
             JsonSerializer.Serialize(new Utf8JsonWriter(pipe.Writer), instance, JsonSerializerOptionsProvider.Options);
+            pipe.Writer.Complete();
         }
 
         /// <summary>
