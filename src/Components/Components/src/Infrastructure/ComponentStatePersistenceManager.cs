@@ -21,7 +21,7 @@ namespace Microsoft.AspNetCore.Components.Infrastructure
     {
         private bool _stateIsPersisted;
         private List<Func<Task>> _pauseCallbacks = new();
-        private readonly Dictionary<string, Pipe> _currentState = new();
+        private readonly Dictionary<string, PooledByteBufferWriter> _currentState = new();
         private readonly ILogger<ComponentStatePersistenceManager> _logger;
 
         /// <summary>
@@ -73,23 +73,14 @@ namespace Microsoft.AspNetCore.Components.Infrastructure
                 var data = new Dictionary<string, ReadOnlySequence<byte>>();
                 foreach (var (key, value) in _currentState)
                 {
-                    data[key] = await ReadToEnd(value.Reader);
+                    data[key] = new ReadOnlySequence<byte>(value.WrittenMemory);
                 }
+
                 await store.PersistStateAsync(data);
-            }
-
-            async Task<ReadOnlySequence<byte>> ReadToEnd(PipeReader reader)
-            {
-                var result = await reader.ReadAsync();
-                reader.AdvanceTo(result.Buffer.Start, result.Buffer.End);
-                while (!result.IsCompleted)
+                foreach (var (key, value) in _currentState)
                 {
-                    // Consume nothing, just wait for everything
-                    result = await reader.ReadAsync();
-                    reader.AdvanceTo(result.Buffer.Start, result.Buffer.End);
+                    value.Dispose();
                 }
-
-                return result.Buffer;
             }
         }
 

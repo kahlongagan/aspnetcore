@@ -8,6 +8,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipelines;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components.Infrastructure;
 using static Microsoft.AspNetCore.Internal.LinkerFlags;
 
 namespace Microsoft.AspNetCore.Components
@@ -18,11 +19,11 @@ namespace Microsoft.AspNetCore.Components
     public class PersistentComponentState
     {
         private IDictionary<string, ReadOnlySequence<byte>>? _existingState;
-        private IDictionary<string, Pipe> _currentState;
+        private IDictionary<string, PooledByteBufferWriter> _currentState;
         private readonly List<Func<Task>> _registeredCallbacks;
 
         internal PersistentComponentState(
-            IDictionary<string, Pipe> currentState,
+            IDictionary<string, PooledByteBufferWriter> currentState,
             List<Func<Task>> pauseCallbacks)
         {
             _currentState = currentState;
@@ -114,10 +115,9 @@ namespace Microsoft.AspNetCore.Components
                 throw new ArgumentException($"There is already a persisted object under the same key '{key}'");
             }
 
-            var pipe = new Pipe();
-            _currentState.Add(key, pipe);
-            valueWriter(pipe.Writer);
-            pipe.Writer.Complete();
+            var writer = new PooledByteBufferWriter();
+            _currentState.Add(key, writer);
+            valueWriter(writer);
         }
 
         /// <summary>
@@ -143,10 +143,9 @@ namespace Microsoft.AspNetCore.Components
                 throw new ArgumentException($"There is already a persisted object under the same key '{key}'");
             }
 
-            var pipe = new Pipe();
-            _currentState.Add(key, pipe);
-            JsonSerializer.Serialize(new Utf8JsonWriter(pipe.Writer), instance, JsonSerializerOptionsProvider.Options);
-            pipe.Writer.Complete();
+            var writer = new PooledByteBufferWriter();
+            _currentState.Add(key, writer);
+            JsonSerializer.Serialize(new Utf8JsonWriter(writer), instance, JsonSerializerOptionsProvider.Options);
         }
 
         /// <summary>

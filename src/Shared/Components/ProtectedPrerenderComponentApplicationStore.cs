@@ -6,6 +6,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components.Infrastructure;
 using Microsoft.AspNetCore.DataProtection;
 
 namespace Microsoft.AspNetCore.Components
@@ -25,12 +26,14 @@ namespace Microsoft.AspNetCore.Components
             DeserializeState(_protector.Unprotect(Convert.FromBase64String(existingState)));
         }
 
-        protected async override Task<byte[]> SerializeState(IReadOnlyDictionary<string, ReadOnlySequence<byte>> state)
+        protected override PooledByteBufferWriter SerializeState(IReadOnlyDictionary<string, ReadOnlySequence<byte>> state)
         {
-            var bytes = await base.SerializeState(state);
+            var bytes = base.SerializeState(state);
             if (_protector != null)
             {
-                bytes = _protector.Protect(bytes);
+                var newBuffer = new PooledByteBufferWriter(_protector.Protect(bytes.WrittenMemory.Span.ToArray()));
+                bytes.Dispose();
+                return newBuffer;
             }
 
             return bytes;

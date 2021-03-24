@@ -4,9 +4,9 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using System.IO.Pipelines;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components.Infrastructure;
 using Xunit;
 
 namespace Microsoft.AspNetCore.Components
@@ -17,7 +17,7 @@ namespace Microsoft.AspNetCore.Components
         public void InitializeExistingState_SetupsState()
         {
             // Arrange
-            var applicationState = new PersistentComponentState(new Dictionary<string, Pipe>(), new List<Func<Task>>());
+            var applicationState = new PersistentComponentState(new Dictionary<string, PooledByteBufferWriter>(), new List<Func<Task>>());
             var existingState = new Dictionary<string, ReadOnlySequence<byte>>
             {
                 ["MyState"] = new ReadOnlySequence<byte>(new byte[] { 1, 2, 3, 4 })
@@ -35,7 +35,7 @@ namespace Microsoft.AspNetCore.Components
         public void InitializeExistingState_ThrowsIfAlreadyInitialized()
         {
             // Arrange
-            var applicationState = new PersistentComponentState(new Dictionary<string, Pipe>(), new List<Func<Task>>());
+            var applicationState = new PersistentComponentState(new Dictionary<string, PooledByteBufferWriter>(), new List<Func<Task>>());
             var existingState = new Dictionary<string, ReadOnlySequence<byte>>
             {
                 ["MyState"] = new ReadOnlySequence<byte>(new byte[] { 1, 2, 3, 4 })
@@ -51,7 +51,7 @@ namespace Microsoft.AspNetCore.Components
         public void TryRetrieveState_ReturnsStateWhenItExists()
         {
             // Arrange
-            var applicationState = new PersistentComponentState(new Dictionary<string, Pipe>(), new List<Func<Task>>());
+            var applicationState = new PersistentComponentState(new Dictionary<string, PooledByteBufferWriter>(), new List<Func<Task>>());
             var existingState = new Dictionary<string, ReadOnlySequence<byte>>
             {
                 ["MyState"] = new ReadOnlySequence<byte>(new byte[] { 1, 2, 3, 4 })
@@ -67,10 +67,10 @@ namespace Microsoft.AspNetCore.Components
         }
 
         [Fact]
-        public async Task PersistState_SavesDataToTheStoreAsync()
+        public void PersistState_SavesDataToTheStoreAsync()
         {
             // Arrange
-            var currentState = new Dictionary<string, Pipe>();
+            var currentState = new Dictionary<string, PooledByteBufferWriter>();
             var applicationState = new PersistentComponentState(currentState, new List<Func<Task>>());
             var myState = new byte[] { 1, 2, 3, 4 };
 
@@ -79,14 +79,14 @@ namespace Microsoft.AspNetCore.Components
 
             // Assert
             Assert.True(currentState.TryGetValue("MyState", out var stored));
-            Assert.Equal(myState, await ReadAllAsync(stored.Reader));
+            Assert.Equal(myState, stored.WrittenMemory.Span.ToArray());
         }
 
         [Fact]
         public void PersistState_ThrowsForDuplicateKeys()
         {
             // Arrange
-            var currentState = new Dictionary<string, Pipe>();
+            var currentState = new Dictionary<string, PooledByteBufferWriter>();
             var applicationState = new PersistentComponentState(currentState, new List<Func<Task>>());
             var myState = new byte[] { 1, 2, 3, 4 };
 
@@ -97,10 +97,10 @@ namespace Microsoft.AspNetCore.Components
         }
 
         [Fact]
-        public async Task PersistAsJson_SerializesTheDataToJsonAsync()
+        public void PersistAsJson_SerializesTheDataToJsonAsync()
         {
             // Arrange
-            var currentState = new Dictionary<string, Pipe>();
+            var currentState = new Dictionary<string, PooledByteBufferWriter>();
             var applicationState = new PersistentComponentState(currentState, new List<Func<Task>>());
             var myState = new byte[] { 1, 2, 3, 4 };
 
@@ -109,14 +109,14 @@ namespace Microsoft.AspNetCore.Components
 
             // Assert
             Assert.True(currentState.TryGetValue("MyState", out var stored));
-            Assert.Equal(myState, JsonSerializer.Deserialize<byte[]>(await ReadAllAsync(stored.Reader)));
+            Assert.Equal(myState, JsonSerializer.Deserialize<byte[]>(stored.WrittenMemory.Span));
         }
 
         [Fact]
-        public async Task PersistAsJson_NullValueAsync()
+        public void PersistAsJson_NullValueAsync()
         {
             // Arrange
-            var currentState = new Dictionary<string, Pipe>();
+            var currentState = new Dictionary<string, PooledByteBufferWriter>();
             var applicationState = new PersistentComponentState(currentState, new List<Func<Task>>());
 
             // Act
@@ -124,7 +124,7 @@ namespace Microsoft.AspNetCore.Components
 
             // Assert
             Assert.True(currentState.TryGetValue("MyState", out var stored));
-            Assert.Null(JsonSerializer.Deserialize<byte[]>(await ReadAllAsync(stored.Reader)));
+            Assert.Null(JsonSerializer.Deserialize<byte[]>(stored.WrittenMemory.Span));
         }
 
         [Fact]
@@ -134,7 +134,7 @@ namespace Microsoft.AspNetCore.Components
             var myState = new byte[] { 1, 2, 3, 4 };
             var serialized = JsonSerializer.SerializeToUtf8Bytes(myState);
             var existingState = new Dictionary<string, ReadOnlySequence<byte>>() { ["MyState"] = new ReadOnlySequence<byte>(serialized) };
-            var applicationState = new PersistentComponentState(new Dictionary<string, Pipe>(), new List<Func<Task>>());
+            var applicationState = new PersistentComponentState(new Dictionary<string, PooledByteBufferWriter>(), new List<Func<Task>>());
 
             applicationState.InitializeExistingState(existingState);
 
@@ -152,7 +152,7 @@ namespace Microsoft.AspNetCore.Components
             // Arrange
             var serialized = JsonSerializer.SerializeToUtf8Bytes<byte []>(null);
             var existingState = new Dictionary<string, ReadOnlySequence<byte>>() { ["MyState"] = new ReadOnlySequence<byte>(serialized) };
-            var applicationState = new PersistentComponentState(new Dictionary<string, Pipe>(), new List<Func<Task>>());
+            var applicationState = new PersistentComponentState(new Dictionary<string, PooledByteBufferWriter>(), new List<Func<Task>>());
 
             applicationState.InitializeExistingState(existingState);
 
@@ -162,22 +162,6 @@ namespace Microsoft.AspNetCore.Components
             // Assert
             Assert.Null(stored);
             Assert.False(applicationState.TryTakeFromJson<byte[]>("MyState", out _));
-        }
-
-        private static async Task<byte[]> ReadAllAsync(PipeReader pipeReader)
-        {
-            while (true)
-            {
-                var result = await pipeReader.ReadAsync();
-
-                if (result.IsCompleted)
-                {
-                    return result.Buffer.ToArray();
-                }
-
-                // Consume nothing, just wait for everything
-                pipeReader.AdvanceTo(result.Buffer.Start, result.Buffer.End);
-            }
         }
     }
 }

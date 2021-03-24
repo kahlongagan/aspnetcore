@@ -35,7 +35,7 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
             await store.PersistStateAsync(state);
 
             // Assert
-            Assert.Equal(expected, _protector.Unprotect(store.PersistedState));
+            Assert.Equal(expected, _protector.Unprotect(store.PersistedState.Span.ToString()));
         }
 
         [Fact]

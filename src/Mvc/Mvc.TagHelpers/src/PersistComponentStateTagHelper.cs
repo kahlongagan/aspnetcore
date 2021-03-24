@@ -2,6 +2,8 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.IO;
+using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Infrastructure;
@@ -88,8 +90,28 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
                 output.Content.SetHtmlContent(
                     new HtmlContentBuilder()
                         .AppendHtml("<!--Blazor-Component-State:")
-                        .AppendHtml(store.PersistedState)
+                        .AppendHtml(new ComponentStateHtmlContent(store))
                         .AppendHtml("-->"));
+            }
+        }
+
+        private class ComponentStateHtmlContent : IHtmlContent
+        {
+            private PrerenderComponentApplicationStore _store;
+
+            public ComponentStateHtmlContent(PrerenderComponentApplicationStore store)
+            {
+                _store = store;
+            }
+
+            public void WriteTo(TextWriter writer, HtmlEncoder encoder)
+            {
+                if (_store != null)
+                {
+                    writer.Write(_store.PersistedState.Span);
+                    _store.Dispose();
+                    _store = null;
+                }
             }
         }
     }

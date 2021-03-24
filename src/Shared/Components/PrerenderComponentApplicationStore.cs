@@ -3,16 +3,22 @@
 
 using System;
 using System.Buffers;
+using System.Buffers.Text;
 using System.Collections.Generic;
-using System.IO.Pipelines;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components.Infrastructure;
 using Microsoft.AspNetCore.Components.Lifetime;
 
 namespace Microsoft.AspNetCore.Components
 {
     internal class PrerenderComponentApplicationStore : IPersistentComponentStateStore
     {
+#nullable enable
+        private char[]? _buffer;
+#nullable disable
+
         public PrerenderComponentApplicationStore()
         {
             ExistingState = new();
@@ -46,7 +52,7 @@ namespace Microsoft.AspNetCore.Components
         }
 
 #nullable enable
-        public string? PersistedState { get; private set; }
+        public ReadOnlyMemory<char> PersistedState { get; private set; }
 #nullable disable
 
         public Dictionary<string, ReadOnlySequence<byte>> ExistingState { get; protected set; }
@@ -56,14 +62,13 @@ namespace Microsoft.AspNetCore.Components
             return Task.FromResult((IDictionary<string, ReadOnlySequence<byte>>)ExistingState);
         }
 
-        protected virtual async Task<byte[]> SerializeState(IReadOnlyDictionary<string, ReadOnlySequence<byte>> state)
+        protected virtual PooledByteBufferWriter SerializeState(IReadOnlyDictionary<string, ReadOnlySequence<byte>> state)
         {
             // System.Text.Json doesn't support serializing ReadonlySequence<byte> so we need to buffer
             // the data with a memory pool here. We will change our serialization strategy in the future here
             // so that we can avoid this step.
-            var pipe = new Pipe();
-            var pipeWriter = pipe.Writer;
-            var jsonWriter = new Utf8JsonWriter(pipeWriter);
+            var buffer = new PooledByteBufferWriter();
+            var jsonWriter = new Utf8JsonWriter(buffer);
             jsonWriter.WriteStartObject();
             foreach (var (key, value) in state)
             {
@@ -80,23 +85,7 @@ namespace Microsoft.AspNetCore.Components
 
             jsonWriter.WriteEndObject();
             jsonWriter.Flush();
-            pipe.Writer.Complete();
-            var result = await ReadToEnd(pipe.Reader);
-            return result.ToArray();
-
-            async Task<ReadOnlySequence<byte>> ReadToEnd(PipeReader reader)
-            {
-                var result = await reader.ReadAsync();
-                reader.AdvanceTo(result.Buffer.Start, result.Buffer.End);
-                while (!result.IsCompleted)
-                {
-                    // Consume nothing, just wait for everything
-                    result = await reader.ReadAsync();
-                    reader.AdvanceTo(result.Buffer.Start, result.Buffer.End);
-                }
-
-                return result.Buffer;
-            }
+            return buffer;
 
             static void WriteMultipleSegments(Utf8JsonWriter jsonWriter, string key, ReadOnlySequence<byte> value)
             {
@@ -118,12 +107,27 @@ namespace Microsoft.AspNetCore.Components
             }
         }
 
-        public async Task PersistStateAsync(IReadOnlyDictionary<string, ReadOnlySequence<byte>> state)
+        public Task PersistStateAsync(IReadOnlyDictionary<string, ReadOnlySequence<byte>> state)
         {
-            var bytes = await SerializeState(state);
+            using var bytes = SerializeState(state);
+            var length = Base64.GetMaxEncodedToUtf8Length(bytes.WrittenCount);
+            // We can do this because the representation in bytes for characters in the base64 alphabet for utf-8 is 1.
+            _buffer = ArrayPool<char>.Shared.Rent(length);
 
-            var result = Convert.ToBase64String(bytes);
-            PersistedState = result;
+            var memory = _buffer.AsMemory().Slice(0, length);
+            Convert.TryToBase64Chars(bytes.WrittenMemory.Span, memory.Span, out _);
+            PersistedState = memory;
+
+            return Task.CompletedTask;
+        }
+
+        public void Dispose()
+        {
+            if (_buffer != null)
+            {
+                ArrayPool<char>.Shared.Return(_buffer, true);
+                _buffer = null;
+            }
         }
     }
 }
