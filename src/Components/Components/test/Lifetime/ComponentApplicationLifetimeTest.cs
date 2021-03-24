@@ -4,6 +4,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.Infrastructure;
 using Microsoft.AspNetCore.Components.Lifetime;
@@ -237,7 +238,8 @@ namespace Microsoft.AspNetCore.Components
 
             public Task PersistStateAsync(IReadOnlyDictionary<string, ReadOnlySequence<byte>> state)
             {
-                State = new Dictionary<string, ReadOnlySequence<byte>>(state);
+                // We copy the data here because it's no longer available after this call completes.
+                State = state.ToDictionary(kvp => kvp.Key, kvp => new ReadOnlySequence<byte>(kvp.Value.ToArray()));
                 return Task.CompletedTask;
             }
         }

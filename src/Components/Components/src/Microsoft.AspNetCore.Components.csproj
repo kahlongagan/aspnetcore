@@ -20,7 +20,6 @@
   <ItemGroup>
     <Reference Include="Microsoft.Extensions.Logging.Abstractions" />
     <Reference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
-    <Reference Include="System.IO.Pipelines" />
   </ItemGroup>
 
   <!--
