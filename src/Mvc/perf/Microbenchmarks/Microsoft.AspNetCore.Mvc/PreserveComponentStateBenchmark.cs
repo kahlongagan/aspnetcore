@@ -5,13 +5,12 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Security.Cryptography;
 using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Infrastructure;
-using Microsoft.AspNetCore.Components.Lifetime;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.TagHelpers;
@@ -50,10 +49,17 @@ namespace Microsoft.AspNetCore.Mvc.Microbenchmarks
                 .AddMvc().Services.BuildServiceProvider();
         }
 
-        [Params(0,1,10,100,1000)]
+        // From 30 entries of about 100 bytes (~3K) to 100 entries with 100K per entry (~10MB)
+        // Sending 10MB of prerendered state is too much, and only used as a way to "stress" the system.
+        // In general, so long as entries don't exceed the buffer limits we are ok.
+        // 300 Kb is the upper limit of a reasonable payload for prerendered state
+        // The 8386 was selected by serializing 100 weather forecast records as a reference
+        // For regular runs we only enable by default 30 entries and 8386 bytes per entry, which is about 250K of serialized
+        // state on the limit of the accepted payload size budget for critical resources served from a page.
+        [Params(30 /*, 100*/)]
         public int Entries;
 
-        [Params(0, 1, 10, 100, 1000)]
+        [Params(/*100,*/ 8386/*, 100_000*/)]
         public int EntrySize;
 
         [GlobalSetup]
@@ -65,12 +71,6 @@ namespace Microsoft.AspNetCore.Mvc.Microbenchmarks
             {
                 _entries.Add(i.ToString(CultureInfo.InvariantCulture), _entryValue);
             }
-        }
-
-        [IterationCleanup]
-        public void TearDown()
-        {
-            _serviceScope.Dispose();
         }
 
         [Benchmark(Description = "Persist component state tag helper webassembly")]
@@ -86,7 +86,8 @@ namespace Microsoft.AspNetCore.Mvc.Microbenchmarks
             _output = new TagHelperOutput("persist-component-state", _attributes, _childContent);
             _output.Content = new DefaultTagHelperContent();
             await _tagHelper.ProcessAsync(_context, _output);
-            _output.Content.GetContent();
+            _output.Content.WriteTo(StreamWriter.Null, NullHtmlEncoder.Default);
+            _serviceScope.Dispose();
         }
 
         private ViewContext GetViewContext()
