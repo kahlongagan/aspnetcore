@@ -64,7 +64,9 @@ namespace Microsoft.AspNetCore.Components.Infrastructure
 
             async Task PauseAndPersistState()
             {
+                State.PersistingState = true;
                 await PauseAsync();
+                State.PersistingState = false;
 
                 var data = new Dictionary<string, ReadOnlySequence<byte>>(StringComparer.Ordinal);
                 foreach (var (key, value) in _currentState)

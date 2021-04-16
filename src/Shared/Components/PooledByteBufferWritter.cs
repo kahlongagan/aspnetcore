@@ -27,42 +27,15 @@ namespace Microsoft.AspNetCore.Components.Infrastructure
             _owned = true;
         }
 
-        public ReadOnlyMemory<byte> WrittenMemory
-        {
-            get
-            {
-                return _currentBuffer.AsMemory(0, _index);
-            }
-        }
+        public ReadOnlyMemory<byte> WrittenMemory => _currentBuffer.AsMemory(0, _index);
 
-        public int WrittenCount
-        {
-            get
-            {
-                return _index;
-            }
-        }
+        public int WrittenCount => _index;
 
-        public int Capacity
-        {
-            get
-            {
-                return _currentBuffer.Length;
-            }
-        }
+        public int Capacity => _currentBuffer.Length;
 
-        public int FreeCapacity
-        {
-            get
-            {
-                return _currentBuffer.Length - _index;
-            }
-        }
+        public int FreeCapacity => _currentBuffer.Length - _index;
 
-        public void Clear()
-        {
-            ClearHelper();
-        }
+        public void Clear() => ClearHelper();
 
         private void ClearHelper()
         {

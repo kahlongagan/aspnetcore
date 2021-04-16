@@ -5,7 +5,6 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.IO.Pipelines;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.Infrastructure;
@@ -20,6 +19,7 @@ namespace Microsoft.AspNetCore.Components
     {
         private IDictionary<string, ReadOnlySequence<byte>>? _existingState;
         private IDictionary<string, PooledByteBufferWriter> _currentState;
+
         private readonly List<Func<Task>> _registeredCallbacks;
 
         internal PersistentComponentState(
@@ -29,6 +29,8 @@ namespace Microsoft.AspNetCore.Components
             _currentState = currentState;
             _registeredCallbacks = pauseCallbacks;
         }
+
+        internal bool PersistingState { get; set; }
 
         internal void InitializeExistingState(IDictionary<string, ReadOnlySequence<byte>> existingState)
         {
@@ -110,6 +112,11 @@ namespace Microsoft.AspNetCore.Components
                 throw new ArgumentNullException(nameof(valueWriter));
             }
 
+            if (!PersistingState)
+            {
+                throw new InvalidOperationException("Persisting state is only allowed during an OnPersisting callback.");
+            }
+
             if (_currentState.ContainsKey(key))
             {
                 throw new ArgumentException($"There is already a persisted object under the same key '{key}'");
@@ -136,6 +143,11 @@ namespace Microsoft.AspNetCore.Components
             if (key is null)
             {
                 throw new ArgumentNullException(nameof(key));
+            }
+
+            if (!PersistingState)
+            {
+                throw new InvalidOperationException("Persisting state is only allowed during an OnPersisting callback.");
             }
 
             if (_currentState.ContainsKey(key))

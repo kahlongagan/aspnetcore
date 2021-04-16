@@ -66,25 +66,33 @@ namespace Microsoft.AspNetCore.Components
             // the data with a memory pool here. We will change our serialization strategy in the future here
             // so that we can avoid this step.
             var buffer = new PooledByteBufferWriter();
-            var jsonWriter = new Utf8JsonWriter(buffer);
-            jsonWriter.WriteStartObject();
-            foreach (var (key, value) in state)
+            try
             {
-                if (value.IsSingleSegment)
+                var jsonWriter = new Utf8JsonWriter(buffer);
+                jsonWriter.WriteStartObject();
+                foreach (var (key, value) in state)
                 {
-                    jsonWriter.WriteBase64String(key, value.First.Span);
+                    if (value.IsSingleSegment)
+                    {
+                        jsonWriter.WriteBase64String(key, value.First.Span);
+                    }
+                    else
+                    {
+                        WriteMultipleSegments(jsonWriter, key, value);
+                    }
+                    jsonWriter.Flush();
                 }
-                else
-                {
-                    WriteMultipleSegments(jsonWriter, key, value);
-                }
+
+                jsonWriter.WriteEndObject();
                 jsonWriter.Flush();
+                return buffer;
+
             }
-
-            jsonWriter.WriteEndObject();
-            jsonWriter.Flush();
-            return buffer;
-
+            catch
+            {
+                buffer.Dispose();
+                throw;
+            }
             static void WriteMultipleSegments(Utf8JsonWriter jsonWriter, string key, ReadOnlySequence<byte> value)
             {
                 byte[] unescapedArray = null;
