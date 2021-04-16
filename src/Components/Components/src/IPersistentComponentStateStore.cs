@@ -2,7 +2,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Microsoft.AspNetCore.Components.Lifetime
+namespace Microsoft.AspNetCore.Components
 {
     /// <summary>
     /// Manages the storage for components and services that are part of a Blazor application.

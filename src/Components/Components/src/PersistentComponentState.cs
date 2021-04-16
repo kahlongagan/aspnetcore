@@ -65,7 +65,7 @@ namespace Microsoft.AspNetCore.Components
         /// <param name="key">The key used to persist the state.</param>
         /// <param name="value">The persisted state.</param>
         /// <returns><c>true</c> if the state was found; <c>false</c> otherwise.</returns>
-        public bool TryTake(string key, [MaybeNullWhen(false)] out ReadOnlySequence<byte> value)
+        public bool TryTake(string key, out ReadOnlySequence<byte> value)
         {
             if (key is null)
             {

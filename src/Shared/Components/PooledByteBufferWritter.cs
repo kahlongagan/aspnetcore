@@ -136,8 +136,7 @@ namespace Microsoft.AspNetCore.Components.Infrastructure
 
                 var previousBuffer = oldBuffer.AsSpan(0, _index);
                 previousBuffer.CopyTo(_currentBuffer);
-                previousBuffer.Clear();
-                ArrayPool<byte>.Shared.Return(oldBuffer);
+                ArrayPool<byte>.Shared.Return(oldBuffer, clearArray: true);
             }
         }
     }

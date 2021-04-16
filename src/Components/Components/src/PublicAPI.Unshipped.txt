@@ -12,14 +12,14 @@ Microsoft.AspNetCore.Components.ErrorBoundaryBase.ErrorContent.set -> void
 Microsoft.AspNetCore.Components.ErrorBoundaryBase.MaximumErrorCount.get -> int
 Microsoft.AspNetCore.Components.ErrorBoundaryBase.MaximumErrorCount.set -> void
 Microsoft.AspNetCore.Components.ErrorBoundaryBase.Recover() -> void
+Microsoft.AspNetCore.Components.IPersistentComponentStateStore
+Microsoft.AspNetCore.Components.IPersistentComponentStateStore.GetPersistedStateAsync() -> System.Threading.Tasks.Task<System.Collections.Generic.IDictionary<string!, System.Buffers.ReadOnlySequence<byte>>!>!
+Microsoft.AspNetCore.Components.IPersistentComponentStateStore.PersistStateAsync(System.Collections.Generic.IReadOnlyDictionary<string!, System.Buffers.ReadOnlySequence<byte>>! state) -> System.Threading.Tasks.Task!
 Microsoft.AspNetCore.Components.Infrastructure.ComponentStatePersistenceManager
 Microsoft.AspNetCore.Components.Infrastructure.ComponentStatePersistenceManager.ComponentStatePersistenceManager(Microsoft.Extensions.Logging.ILogger<Microsoft.AspNetCore.Components.Infrastructure.ComponentStatePersistenceManager!>! logger) -> void
-Microsoft.AspNetCore.Components.Infrastructure.ComponentStatePersistenceManager.PersistStateAsync(Microsoft.AspNetCore.Components.Lifetime.IPersistentComponentStateStore! store, Microsoft.AspNetCore.Components.RenderTree.Renderer! renderer) -> System.Threading.Tasks.Task!
-Microsoft.AspNetCore.Components.Infrastructure.ComponentStatePersistenceManager.RestoreStateAsync(Microsoft.AspNetCore.Components.Lifetime.IPersistentComponentStateStore! store) -> System.Threading.Tasks.Task!
+Microsoft.AspNetCore.Components.Infrastructure.ComponentStatePersistenceManager.PersistStateAsync(Microsoft.AspNetCore.Components.IPersistentComponentStateStore! store, Microsoft.AspNetCore.Components.RenderTree.Renderer! renderer) -> System.Threading.Tasks.Task!
+Microsoft.AspNetCore.Components.Infrastructure.ComponentStatePersistenceManager.RestoreStateAsync(Microsoft.AspNetCore.Components.IPersistentComponentStateStore! store) -> System.Threading.Tasks.Task!
 Microsoft.AspNetCore.Components.Infrastructure.ComponentStatePersistenceManager.State.get -> Microsoft.AspNetCore.Components.PersistentComponentState!
-Microsoft.AspNetCore.Components.Lifetime.IPersistentComponentStateStore
-Microsoft.AspNetCore.Components.Lifetime.IPersistentComponentStateStore.GetPersistedStateAsync() -> System.Threading.Tasks.Task<System.Collections.Generic.IDictionary<string!, System.Buffers.ReadOnlySequence<byte>>!>!
-Microsoft.AspNetCore.Components.Lifetime.IPersistentComponentStateStore.PersistStateAsync(System.Collections.Generic.IReadOnlyDictionary<string!, System.Buffers.ReadOnlySequence<byte>>! state) -> System.Threading.Tasks.Task!
 Microsoft.AspNetCore.Components.PersistentComponentState
 Microsoft.AspNetCore.Components.PersistentComponentState.Persist(string! key, System.Action<System.Buffers.IBufferWriter<byte>!>! valueWriter) -> void
 Microsoft.AspNetCore.Components.PersistentComponentState.PersistAsJson<TValue>(string! key, TValue instance) -> void

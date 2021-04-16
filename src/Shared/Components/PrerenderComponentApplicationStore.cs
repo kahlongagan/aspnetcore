@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.Infrastructure;
-using Microsoft.AspNetCore.Components.Lifetime;
 
 namespace Microsoft.AspNetCore.Components
 {
@@ -89,11 +88,11 @@ namespace Microsoft.AspNetCore.Components
             static void WriteMultipleSegments(Utf8JsonWriter jsonWriter, string key, ReadOnlySequence<byte> value)
             {
                 byte[] unescapedArray = null;
-                var valueLenght = (int)value.Length;
+                var valueLength = (int)value.Length;
 
                 Span<byte> valueSegment = value.Length <= 256 ?
-                    stackalloc byte[valueLenght] :
-                    (unescapedArray = ArrayPool<byte>.Shared.Rent(valueLenght)).AsSpan().Slice(0, valueLenght);
+                    stackalloc byte[valueLength] :
+                    (unescapedArray = ArrayPool<byte>.Shared.Rent(valueLength)).AsSpan().Slice(0, valueLength);
 
                 value.CopyTo(valueSegment);
                 jsonWriter.WriteBase64String(key, valueSegment);
